@@ -2,21 +2,18 @@ from skyfield.api import load, EarthSatellite
 from datetime import datetime
 from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
-import google.generativeai as genai
 import math
 import os
-import logging
 
-# ====== LOGGING (Railway debug friendly) ======
-logging.basicConfig(level=logging.INFO)
+# ====== NEW GEMINI SDK (FIXED) ======
+from google import genai
 
 # ====== TOKENS ======
 TELEGRAM_TOKEN = os.environ.get("TELEGRAM_TOKEN", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
-# ====== GEMINI SETUP ======
-genai.configure(api_key=GEMINI_API_KEY)
-model = genai.GenerativeModel("gemini-2.5-flash")
+# ====== GEMINI SETUP (FIXED) ======
+client = genai.Client(api_key=GEMINI_API_KEY)
 
 # ====== SATELLITE ======
 line1 = "1 43678U 18084H   26071.99099230  .00005079  00000-0  41314-3 0  9993"
@@ -46,7 +43,7 @@ def get_satellite_data():
         "time": datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')
     }
 
-# ====== /satellite COMMAND ======
+# ====== COMMAND: /satellite ======
 async def satellite(update: Update, context: ContextTypes.DEFAULT_TYPE):
     data = get_satellite_data()
     user_id = update.effective_user.id
@@ -77,7 +74,7 @@ Time: {data['time']}
 
     await update.message.reply_text(message)
 
-# ====== MESSAGE HANDLER ======
+# ====== MESSAGE HANDLER (FIXED GEMINI ONLY) ======
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_id = update.effective_user.id
     text = update.message.text.lower()
@@ -127,9 +124,15 @@ Rules:
 - Keep answers short and natural
 """
 
+    # ====== FIXED GEMINI CALL ======
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=prompt
+        )
+
         await update.message.reply_text(response.text)
+
     except Exception as e:
         await update.message.reply_text(f"❌ AI Error: {e}")
 
@@ -138,17 +141,22 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = """
 👋 Welcome to DIWATA-2 Satellite AI Tracker!
 
-- /diwata2 → live satellite data
+What you can do:
+- Click /diwata2 → get live satellite data
 - Ask questions like:
-  • what is it?
-  • is it above me?
-  • explain data
+  • "what is it?"
+  • "explain"
+  • "is it above me?"
+  • "what are those data?"
+
+I will explain satellite data using AI in simple terms.
 
 — Designed by Andrew (Zay Bhone Aung).
 """
+
     await update.message.reply_text(welcome_text)
 
-# ====== MAIN APP ======
+# ====== MAIN ======
 app = ApplicationBuilder().token(TELEGRAM_TOKEN).build()
 
 app.add_handler(CommandHandler("start", start))
@@ -157,5 +165,4 @@ app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
 print("🤖 Smart Satellite AI Bot running...")
 
-# Railway-safe start
 app.run_polling(drop_pending_updates=True)
