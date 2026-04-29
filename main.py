@@ -4,8 +4,6 @@ from telegram import Update
 from telegram.ext import ApplicationBuilder, CommandHandler, MessageHandler, filters, ContextTypes
 import math
 import os
-
-# ====== NEW GEMINI SDK (FIXED) ======
 from google import genai
 
 # ====== TOKENS ======
